@@ -1,0 +1,33 @@
+name: Manual Force Stop All (Backup Kill Switch)
+
+on:
+  workflow_dispatch: 
+
+permissions:
+  actions: write
+
+jobs:
+  manual-cancel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Force Stop All Actions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "[*] Manual Kill Switch Triggered! Stopping all running actions..."
+          
+          RUNS=$(gh run list --status in_progress --json databaseId -q ".[] | select(.databaseId != $GITHUB_RUN_ID) | .databaseId")
+          
+          if [ -z "$RUNS" ]; then
+            echo "[+] Koi workflow running nahi hai. System pehle se clear hai."
+            exit 0
+          fi
+
+          echo "$RUNS" | while read -r RUN_ID; do
+            if [ -n "$RUN_ID" ]; then
+              echo "[🛑] Cancelling Workflow Run ID: $RUN_ID"
+              gh run cancel "$RUN_ID" || true
+            fi
+          done
+          
+          echo "[🎉] Sab actions manually band kar diye gaye hain!"
