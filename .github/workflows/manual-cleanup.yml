@@ -1,0 +1,35 @@
+name: Manual Safai Bot (Delete Kachra)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write 
+
+jobs:
+  manual-cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Cancelled Workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "[*] Manual Safai Bot Started! Checking for cancelled workflows..."
+          
+          CANCELLED_RUNS=$(gh run list --status cancelled --json databaseId -q ".[].databaseId")
+          
+          if [ -z "$CANCELLED_RUNS" ]; then
+            echo "[+] Koi kachra nahi mila. Actions tab bilkul saaf hai!"
+            exit 0
+          fi
+
+          echo "[!] Kachra mil gaya. Safai shuru kar rahe hain..."
+          
+          for RUN_ID in $CANCELLED_RUNS; do
+            if [ -n "$RUN_ID" ]; then
+              echo "[-] Permanently Deleting Run ID: $RUN_ID"
+              gh run delete "$RUN_ID" || true
+            fi
+          done
+          
+          echo "[+] Safai mukammal! Actions tab ab chamak raha hai."
