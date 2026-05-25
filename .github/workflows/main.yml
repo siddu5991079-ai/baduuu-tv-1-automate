@@ -1,0 +1,101 @@
+name: 24/7 Pro Stream Bot & Debugger
+
+# 👇 Yahan run-name add kiya gaya hai taake Actions tab mein Channel no. show ho
+run-name: "Stream Bot - Channel ${{ inputs.okru_stream_channel }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target Stream URL'
+        required: true
+        type: string
+        default: 'https://dadocric.st/player.php?id=starsp3&v=m'
+      okru_stream_channel:
+        description: 'OK.ru Broadcast Channel (1 to 8)'
+        required: true
+        type: choice
+        options: [ 
+          '1', '1.1', '1.2', 
+          '2', '2.1', '2.2', 
+          '3', '3.1', '3.2', 
+          '4', '4.1', '4.2', '4.3', '4.4', '4.5', 
+          '5', '5.1', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', 
+          's1.1', 's1.2', 's1.3', 's1.4', 's1.5', 's1.6', 's1.7', 's1.8', 's1.9', 's1.10', 
+          's2.1', 's2.2', 's2.3', 's2.4', 's2.5', 's2.6', 's2.7', 's2.8', 's2.9', 's2.10' 
+        ]
+        default: '1'
+      server_selection:
+        description: 'Target Server Button (e.g., Server 1, Server 2) - Type "None" to skip'
+        required: true
+        type: string
+        default: 'None'
+      stream_quality:
+        description: 'Internet Speed / Stream Quality'
+        required: true
+        type: choice
+        options: [ '110KBps (Balanced 480p)', '50KBps (Data Saver 360p)', '30KBps (Ultra Low 240p)' ]
+        default: '110KBps (Balanced 480p)'
+      # 👇 Yeh naya input add kiya gaya hai Custom Duration ke liye
+      custom_duration:
+        description: 'Exact Duration to run (e.g., 4h 30m, 5h). Type "None" for auto-overlap.'
+        required: true
+        type: string
+        default: 'None'
+
+permissions:
+  contents: write
+  actions: write 
+
+jobs:
+  stream-and-record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # 6 Hours Limit
+
+    steps:
+    - name: Get Code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install FFmpeg, Virtual Display, & Audio Server
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg xvfb pulseaudio dbus-x11
+
+    - name: Install NPM Packages
+      run: npm install
+
+    - name: Run Script (Live Broadcast + Debug Recording)
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        GITHUB_RUN_ID: ${{ github.run_id }} 
+        TARGET_URL: ${{ github.event.inputs.target_url }}
+        OKRU_STREAM_ID: ${{ github.event.inputs.okru_stream_channel }}
+        SERVER_SELECTION: ${{ github.event.inputs.server_selection }}
+        STREAM_QUALITY: ${{ github.event.inputs.stream_quality }}
+        # 👇 Yeh variable backend script ko pass hoga
+        CUSTOM_DURATION: ${{ github.event.inputs.custom_duration }}
+      run: |
+        pulseaudio -D --exit-idle-time=-1
+        pacmd load-module module-virtual-sink sink_name=v1
+        pacmd set-default-sink v1
+        pacmd set-default-source v1.monitor
+        xvfb-run -s "-screen 0 1280x720x24 -ac" node stream.js
+
+    # 🚀 MAGIC UPLOAD TO RELEASES (RUNS EVEN IF ACTION IS CANCELLED!)
+    - name: Final Upload (Video & Leftover Screenshots)
+      if: always() 
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: "live-stream-logs"
+        name: "Live Broadcast Logs"
+        body: "Auto updated live stream status and final video."
+        files: |
+          recording.mp4
+          screenshots/*.png
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
